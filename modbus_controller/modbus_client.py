@@ -2,6 +2,7 @@ import time
 import random
 import logging
 import argparse
+import random
 from pymodbus.client.tcp import ModbusTcpClient
 
 
@@ -25,8 +26,11 @@ class GeneratorController:
         self.update()
         
     def read_temperatures(self):
+
         self.temperature = self.client.read_holding_registers(address=56, count=1, slave=0).registers[0]
         self.target_temp = self.client.read_holding_registers(address=0, count=1, slave=0).registers[0]
+        logging.log(logging.INFO, f"temp is {self.temperature}")
+
         cold = (self.target_temp < self.temperature)
         #set coil 1 of slave 1 (cooler) on to turn on air conditioning
         self.client.write_coil(0, cold, slave=1)
@@ -48,6 +52,9 @@ class GeneratorController:
     def set_temperature(self):
         self.client.write_register(address=0, value=self.target_temp)
     
+    def attack_temperature(self):
+        self.client.write_register(address=56, value=10, slave=0)
+    
     def get_demand(self):
         increase = random.normalvariate(0, 15)
         if self.desired_power > 250:
@@ -60,12 +67,16 @@ class GeneratorController:
         self.desired_power = max(min(self.desired_power, 500), 0)
         
     def set_targets(self):
-        self.set_temperature()
+        #self.set_temperature()
         self.set_power()
         logging.log(logging.INFO, f"set targets to speed {self.desired_speed}, power {self.desired_power}")
 
     def update(self):
+        #ocassionally set a fake temperature to make 'attack' traffic
+        if random.randint(0,50) >= 50:
+            self.attack_temperature()
         self.read_temperatures()
+        
         self.get_demand()
         self.read_power()
         logging.log(logging.INFO, f"desired power: {self.desired_power}, actual power: {self.power_output}")

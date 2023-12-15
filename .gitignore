@@ -1,0 +1,4 @@
+tcpdump/
+cyberdeck_capture/
+modbus_transaction_parser/target/
+modbus_transaction_parser/modbus_trans.jsonl

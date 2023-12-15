@@ -1,14 +1,14 @@
 [package]
-name = "anomaly_detector"
+name = "modbus_transaction_parser"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cms = { git = "https://github.com/m-m-adams/midas-rs", version = "1.0.0" }
 easy-error = "1.0.0"
 etherparse = "0.13.0"
+libc = "0.2.150"
 nom = "7.1.3"
 pcap = "1.1.0"
 pktparse = "0.7.1"

@@ -1,11 +1,6 @@
-use pcap::Capture;
-use nom::{number, IResult, Finish, bytes};
-use pktparse::{ethernet, ipv4, tcp};
-pub use pktparse::ethernet::{MacAddress, EtherType};
-use sawp::parser::{Direction, Parse};
-use sawp::error::Error;
-use sawp::error::ErrorKind;
-use sawp_modbus::{Modbus, Message};
+use nom::{bytes, number, IResult};
+
+pub use pktparse::ethernet::{EtherType, MacAddress};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
