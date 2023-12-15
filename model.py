@@ -67,12 +67,13 @@ att_ts_df = att_ts_df.dropna(axis=1)[columns]
 
 # %%
 ts_df['score'] = model.predict(ts_df[columns])
-ts_df['smoothed_score'] = ts_df['score'].resample('5T', label='right', closed='right').mean().resample('10S').ffill()*100
+ts_df['att_prob'] = ts_df['score'].resample('5T', label='right', closed='right').mean().resample('10S').interpolate()*200
 
 att_ts_df['score'] = model.predict(att_ts_df[columns])
-att_ts_df['smoothed_score'] = att_ts_df['score'].resample('5T', label='right', closed='right').mean().resample('10S').ffill()*100
+att_ts_df['att_prob'] = att_ts_df['score'].resample('5T', label='right', closed='right').mean().resample('10S').interpolate()*200
 
-combined = pd.concat([ts_df.iloc[1000:3000][columns + ['smoothed_score']], att_ts_df[columns + ['smoothed_score']]])
-combined['attack'] = combined['smoothed_score'] > 25
-combined.reset_index().drop("time", axis=1).plot()
+combined = pd.concat([ts_df.iloc[1000:5000][columns + ['att_prob']].resample('5T', label='right', closed='right').mean(), att_ts_df[columns + ['att_prob']].resample('5T', label='right', closed='right').mean()])
+
+combined[["0:56:register","2:4:register", "att_prob"]].reset_index().drop("time", axis=1)\
+    .plot(title="HMM attack probabilities", ylabel="Register value", xlabel="Seconds since simulation start")
 # %%
