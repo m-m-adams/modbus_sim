@@ -20,7 +20,7 @@ class Heater:
     def __init__(self, s_temp: ModbusSlaveContext, s_heat: ModbusSlaveContext, temperature:float):
         self.current_temperature = temperature
         self.ctx_temp = s_temp
-        self.ctx_heat = s_heat
+        self.ctx_cooling = s_heat
 
     def read_temperature(self,):
         temps = self.ctx_temp.getValues(3, 50, num_temps)
@@ -31,36 +31,36 @@ class Heater:
 
         self.ctx_temp.setValues(3, 50, temps[1:num_temps+1])
         
-    def turn_heat_on(self):
+    def turn_cooling_on(self):
 
         target_temp = self.ctx_temp.getValues(3, 1, 1)[0]
         current_temp = self.ctx_temp.getValues(3, 56, 1)[0]
         logging.log(logging.DEBUG, f'target temp is {target_temp}, current is {current_temp}')
-        amount = (target_temp > current_temp)
+        amount = (target_temp < current_temp)
         #set coil 1 of slave 1 (heater) on to turn on heat
-        self.ctx_heat.setValues(1, 0, [amount])
+        self.ctx_cooling.setValues(1, 0, [amount])
         
 
-    def heat(self):
-        on = self.ctx_heat.getValues(1,0)[0]
+    def update_temperature(self):
+        on = self.ctx_cooling.getValues(1,0)[0]
         
         if on:
             #set coil 2 on to indicate heat running
-            self.ctx_heat.setValues(1,2,[True]) 
-            self.ctx_heat.setValues(3, 1, [2])
-        running = self.ctx_heat.getValues(1,2,1)[0]
-        logging.log(logging.DEBUG, f'heat is switched {"on" if on else "off"} and {"running" if running else "not running"}')
+            self.ctx_cooling.setValues(1,2,[True]) 
+            self.ctx_cooling.setValues(3, 1, [2])
+        running = self.ctx_cooling.getValues(1,2,1)[0]
+        logging.log(logging.DEBUG, f'cooling is switched {"on" if on else "off"} and {"running" if running else "not running"}')
         if running:
-            r = self.ctx_heat.getValues(3, 1)[0] - 1
+            r = self.ctx_cooling.getValues(3, 1)[0] - 1
             if r >= 1:
-                self.ctx_heat.setValues(6, 1, [r-1])
-                self.current_temperature = self.current_temperature + (hot - self.current_temperature)/10
+                self.ctx_cooling.setValues(6, 1, [r-1])
+                self.current_temperature = self.current_temperature + (cold - self.current_temperature)/10
             else:
-                self.ctx_heat.setValues(1,2,[False]) 
+                self.ctx_cooling.setValues(1,2,[False]) 
 
         else:
-            self.ctx_heat.setValues(1,2,[False]) 
-            self.current_temperature = self.current_temperature + (cold - self.current_temperature)/15
+            self.ctx_cooling.setValues(1,2,[False]) 
+            self.current_temperature = self.current_temperature + (hot - self.current_temperature)/15
 
 
     async def updating_writer(self):
@@ -69,7 +69,7 @@ class Heater:
             await asyncio.sleep(1)
             self.read_temperature()
             #self.turn_heat_on()
-            self.heat()
+            self.update_temperature()
     
 
 

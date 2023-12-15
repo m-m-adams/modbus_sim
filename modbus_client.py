@@ -12,7 +12,7 @@ while True:
     current_temp = client.read_holding_registers(address=56, count=1).registers[0]
 
     # Should check for errors here... i.e.
-    cold = (target_temp > current_temp)
+    cold = (target_temp < current_temp)
 
     #set coil 1 of slave 1 (heater) on to turn on heat
     client.write_coil(0, cold, slave=1)
