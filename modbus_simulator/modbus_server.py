@@ -3,6 +3,7 @@ import logging
 import asyncio
 import math
 import generator
+import argparse
 from pymodbus.device import ModbusDeviceIdentification
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
 from pymodbus.server.async_io import StartTcpServer, StartAsyncTcpServer
@@ -82,7 +83,7 @@ class Heater:
     
 
 
-async def run_updating_server():
+async def run_updating_server(hostname="localhost", port=5502):
     # ----------------------------------------------------------------------- # 
     # initialize your data store
     # ----------------------------------------------------------------------- # 
@@ -137,8 +138,13 @@ async def run_updating_server():
     heater = Heater(context)
     task = asyncio.create_task(heater.updating_writer())
     
-    await StartAsyncTcpServer(context=context, identity=identity, address=("localhost", 5502))
+    await StartAsyncTcpServer(context=context, identity=identity, address=(hostname, port))
 
 
 if __name__ == "__main__":
-    asyncio.run(run_updating_server())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hostname", nargs='?', type=str, default="localhost")
+    parser.add_argument("--port", nargs='?', type=int, default=5502)
+    args = parser.parse_args()
+    print(args)
+    asyncio.run(run_updating_server(args.hostname, args.port))
