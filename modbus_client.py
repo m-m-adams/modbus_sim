@@ -1,28 +1,28 @@
-import random
-import logging
 import time
 from pymodbus.client.tcp import ModbusTcpClient
-from pymodbus import mei_message
 
 # Connect to the Modbus TCP server
-client = ModbusTcpClient('localhost', port=5502, slave=0)
-print(client.connect())
-
+client = ModbusTcpClient('localhost', port=5502)
 print(client.read_device_information().information)
-# Read the values from the Modbus registers
-holding_registers = client.read_holding_registers(address=1, count=1)
 
-input_registers = client.read_input_registers(address=1, count=7)
+while True:
+    # Read the values from the Modbus registers
+    target_temp = client.read_holding_registers(address=0, count=1, slave=0).registers[0]
 
-# Should check for errors here... i.e.
+    current_temp = client.read_holding_registers(address=56, count=1).registers[0]
 
+    # Should check for errors here... i.e.
+    cold = (target_temp > current_temp)
 
-# Print the values
-#print("Coils:", coils.bits)
-#print("Discrete Inputs:", discrete_inputs.bits)
-print("Holding Registers:", holding_registers.registers)
-print("Input Registers:", input_registers.registers)
+    #set coil 1 of slave 1 (heater) on to turn on heat
+    client.write_coil(0, cold, slave=1)
 
-client.write_register(address=0, value=35)
-print(client.read_holding_registers(address=0, count=1).registers)
+    # Print the values
+    #print("Coils:", coils.bits)
+    #print("Discrete Inputs:", discrete_inputs.bits)
+    print("Target Temp:", target_temp)
+    print("Current Temp:", current_temp)
+
+    client.write_register(address=0, value=22)
+    time.sleep(5)
 client.close()
