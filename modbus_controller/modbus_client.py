@@ -14,6 +14,7 @@ class GeneratorController:
     power_output: float
     desired_power: float
     cooling: bool
+    cooling_running: bool
     overheated: bool = False
     max_temperature: bool = 75
 
@@ -29,6 +30,7 @@ class GeneratorController:
         cold = (self.target_temp < self.temperature)
         #set coil 1 of slave 1 (cooler) on to turn on air conditioning
         self.client.write_coil(0, cold, slave=1)
+        self.cooling_running = self.client.read_coils(2, 1, slave=1).bits[0]
         self.cooling = cold
 
     def read_power(self):
@@ -38,6 +40,8 @@ class GeneratorController:
         if self.cooling:
             power_req += 100
         self.desired_speed = power_req / 5
+    
+    def set_power(self):
         self.client.write_register(1, int(self.desired_speed), slave=2)
         self.client.write_register(2, int(self.desired_power), slave=2)
 
@@ -55,14 +59,18 @@ class GeneratorController:
         self.desired_power = self.desired_power + increase
         self.desired_power = max(min(self.desired_power, 500), 0)
         
-
+    def set_targets(self):
+        self.set_temperature()
+        self.set_power()
+        logging.log(logging.INFO, f"set targets to speed {self.desired_speed}, power {self.desired_power}")
 
     def update(self):
         self.read_temperatures()
-        self.set_temperature()
         self.get_demand()
         self.read_power()
-        logging.log(logging.INFO, f"desired power: {self.desired_power}\nactual power: {self.power_output}")
+        logging.log(logging.INFO, f"desired power: {self.desired_power}, actual power: {self.power_output}")
+        logging.log(logging.INFO, f"desired speed: {self.desired_speed}, actual speed: {self.speed}")
+        logging.log(logging.INFO, f"cooling is {'on' if self.cooling else 'off'} and {'running' if self.cooling_running else 'not running'}")
 
 if __name__ == "__main__":
     log = logging.getLogger()
@@ -77,8 +85,11 @@ if __name__ == "__main__":
     logging.log(logging.INFO, client.read_device_information().information)
     controller = GeneratorController(client)
 
-
+    counter: int = 0
     while True:
         controller.update()
-        time.sleep(5)
+        time.sleep(1)
+        counter +=1
+        if counter % 5 == 0:
+            controller.set_targets()
     client.close()
