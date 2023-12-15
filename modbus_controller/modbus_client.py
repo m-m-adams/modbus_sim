@@ -1,5 +1,7 @@
 import time
 import random
+import logging
+import argparse
 from pymodbus.client.tcp import ModbusTcpClient
 
 
@@ -52,21 +54,31 @@ class GeneratorController:
 
         self.desired_power = self.desired_power + increase
         self.desired_power = max(min(self.desired_power, 500), 0)
-        print(self.desired_power)
+        
+
 
     def update(self):
         self.read_temperatures()
         self.set_temperature()
         self.get_demand()
         self.read_power()
+        logging.log(logging.INFO, f"desired power: {self.desired_power}\nactual power: {self.power_output}")
 
-# Connect to the Modbus TCP server
-client = ModbusTcpClient('localhost', port=5502)
-print(client.read_device_information().information)
-controller = GeneratorController(client)
+if __name__ == "__main__":
+    log = logging.getLogger()
+    log.setLevel(logging.INFO)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hostname", nargs='?', type=str, default="localhost")
+    parser.add_argument("--port", nargs='?', type=int, default=502)
+    args = parser.parse_args()
+    logging.log(logging.INFO, f"connecting to {args.hostname}:{args.port}")
+    # Connect to the Modbus TCP server
+    client = ModbusTcpClient(args.hostname, port=args.port)
+    logging.log(logging.INFO, client.read_device_information().information)
+    controller = GeneratorController(client)
 
 
-while True:
-    controller.update()
-    time.sleep(5)
-client.close()
+    while True:
+        controller.update()
+        time.sleep(5)
+    client.close()

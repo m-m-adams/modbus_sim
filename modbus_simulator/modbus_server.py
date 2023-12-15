@@ -12,7 +12,7 @@ from twisted.internet.task import LoopingCall
 # Enable logging (makes it easier to debug if something goes wrong)
 logging.basicConfig()
 log = logging.getLogger()
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 hot = 75
 cold = 5
 num_temps = 7
@@ -28,7 +28,7 @@ class Heater:
     def read_temperature(self,):
         temps = self.ctx_temp.getValues(3, 50, num_temps)
         new_temp = self.generator.get_temp()
-        logging.log(logging.DEBUG, f'temp is {new_temp}')
+        logging.log(logging.INFO, f'temp is {new_temp}')
         new_temp = int(max(0, new_temp))
         temps.append(new_temp)
         self.ctx_temp.setValues(3, 50, temps[1:num_temps+1])
@@ -43,7 +43,7 @@ class Heater:
             self.ctx_cooling.setValues(3, 1, [2])
         running = self.ctx_cooling.getValues(1,2,1)[0]
         self.generator.cooling = bool(running)
-        logging.log(logging.DEBUG, f'cooling is switched {"on" if on else "off"} and {"running" if running else "not running"}')
+        logging.log(logging.INFO, f'cooling is switched {"on" if on else "off"} and {"running" if running else "not running"}')
         if running:
             r = self.ctx_cooling.getValues(3, 1)[0] - 1
             if r >= 1:
@@ -64,8 +64,8 @@ class Heater:
 
         speed = self.generator.speed
         self.ctx_generator.setValues(6,4,[speed])
-        print(f"speed is {speed}, desired is {desired_speed[0]}")
-        print(f"power is {output_power}, desired is {desired_power[0]}")
+        logging.log(logging.INFO, f"speed is {speed}, desired is {desired_speed[0]}")
+        logging.log(logging.INFO, f"power is {output_power}, desired is {desired_power[0]}")
 
 
 
@@ -146,5 +146,5 @@ if __name__ == "__main__":
     parser.add_argument("--hostname", nargs='?', type=str, default="localhost")
     parser.add_argument("--port", nargs='?', type=int, default=5502)
     args = parser.parse_args()
-    print(args)
+    logging.log(logging.INFO, f"starting at {args.hostname}:{args.port}")
     asyncio.run(run_updating_server(args.hostname, args.port))
