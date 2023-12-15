@@ -1,26 +1,27 @@
 use pcap::Capture;
+use serde::{Deserialize, Serialize};
+use serde_json::Result;
 use std::collections::HashMap;
 use easy_error::{bail, Error};
 use pktparse::{ipv4, tcp};
 use sawp::parser::{Direction, Parse};
 use sawp::error::ErrorKind;
-use sawp_modbus::{Modbus, Message, Data, Function, Flags, AccessType, CodeCategory, ErrorFlags};
+use sawp_modbus::{Modbus, Message, Data, FunctionCode, Flags, AccessType, CodeCategory, ErrorFlags, Read, Write};
 mod ethernet;
 use ethernet::{*};
 
 
 /// Breakdown of the parsed modbus transaction
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Transaction {
+    pub time: i64,
     pub transaction_id: u16,
     pub valid: bool,
     pub unit_id: u8,
-    pub function: Function,
-    pub access_type: Flags<AccessType>,
-    pub category: Flags<CodeCategory>,
-    pub request_data: Data,
-    pub response_data: Data,
-    pub error_flags: Flags<ErrorFlags>,
+    pub function: u8,
+    pub address: u16,
+    pub response_data: Vec<u8>,
+
 }
 
 
@@ -49,13 +50,13 @@ fn parse_modbus(input: &[u8], direction: Direction) -> std::result::Result<Optio
     
 
 }
-fn main() -> Result<(), nom::error::ErrorKind> {
+fn main()  {
 
 let mut cap = Capture::from_file("../tcpdump/tcpdump.pcap").unwrap();
 
     let mut sessions: HashMap<u16, Message> = HashMap::new();
     while let Ok(packet) = cap.next_packet() {
-            let time = packet.header.ts;
+            let time = packet.header.ts.tv_sec;
             if let Ok((remaining, eth_frame)) = parse_ethernet_frame(packet.data) {
 
                 if eth_frame.ethertype != ethernet::EtherType::IPv4 {
@@ -82,17 +83,27 @@ let mut cap = Capture::from_file("../tcpdump/tcpdump.pcap").unwrap();
                             }
                             match sessions.remove_entry(&message.transaction_id) {
                                 Some(request) => {
-                                    let valid:bool = message.matches(&request.1); 
+                                    let valid:bool = message.matches(&request.1);
+                                    let data = match message.data {
+                                        Data::Read(Read::Response(data)) => data,
+                                        Data::Write(Write::Other { address, data }) => data.to_be_bytes().to_vec(),
+                                        _ => vec!(),
+                                    };
+                                    let address = match request.1.data {
+                                        Data::Read(Read::Request { address, quantity }) => address,
+                                        Data::Write(Write::Other { address, data }) => address,
+                                        _ => 0,
+                                    };
+
                                     let trans = Transaction{
+                                        time,
                                         transaction_id: message.transaction_id,
                                         valid,
                                         unit_id: message.unit_id,
-                                        function: request.1.function,
-                                        access_type: request.1.access_type,
-                                        category: request.1.category,
-                                        request_data: request.1.data,
-                                        response_data: message.data,
-                                        error_flags: message.error_flags,
+                                        function: request.1.function.raw,
+                                        address: address,
+                                        response_data: data,
+
                                     };
                                     println!("{:x?}", trans);
                                 }
@@ -111,5 +122,5 @@ let mut cap = Capture::from_file("../tcpdump/tcpdump.pcap").unwrap();
             }
         }
     }
-    return Ok(())
+
 }
