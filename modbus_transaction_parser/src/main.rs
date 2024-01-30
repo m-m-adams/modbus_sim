@@ -1,16 +1,35 @@
 use easy_error::{bail, Error};
 use pcap::Capture;
-use pktparse::{ipv4, tcp};
+use pktparse::{ipv4, tcp, ethernet};
 use sawp::error::ErrorKind;
 use sawp::parser::{Direction, Parse};
-use sawp_modbus::{AccessType, Data, Message, Modbus, Read, Write};
+use sawp_modbus as modbus;
+use sawp_modbus::Modbus;
 use std::collections::HashMap;
-mod ethernet;
+use std::fs::File;
+use std::io::{stdout, BufWriter, Write};
+use std::process::Output;
+use structopt::StructOpt;
+use std::path::PathBuf;
 mod modbus_defs;
 use ethernet::*;
 use modbus_defs::*;
 
-fn parse_modbus(input: &[u8], direction: Direction) -> std::result::Result<Option<Message>, Error> {
+#[derive(Debug, StructOpt)]
+#[structopt(name = "example", about = "An example of StructOpt usage.")]
+struct Opt {
+
+    /// Input file
+    #[structopt(parse(from_os_str))]
+    input: PathBuf,
+
+    /// Output file, stdout if not present
+    #[structopt(parse(from_os_str))]
+    output: Option<PathBuf>,
+
+}
+
+fn parse_modbus(input: &[u8], direction: Direction) -> std::result::Result<Option<modbus::Message>, Error> {
     let modbus = Modbus::default();
     let bytes = input;
 
@@ -34,14 +53,24 @@ fn parse_modbus(input: &[u8], direction: Direction) -> std::result::Result<Optio
     }
 }
 fn main() {
-    let mut cap = Capture::from_file("../tcpdump/tcpdump.pcap").unwrap();
-
-    let mut sessions: HashMap<u16, Message> = HashMap::new();
+    let opt = Opt::from_args();
+    let mut cap = Capture::from_file(opt.input).unwrap();
+    let mut writer: BufWriter<Box<dyn std::io::Write>> = match opt.output {
+        Some(path) => {
+            let file = File::create(path).unwrap();
+            BufWriter::new(Box::new(file))
+        },
+        None => {
+            BufWriter::new(Box::new(stdout().lock()))
+        }
+    };
+    
+    let mut sessions: HashMap<u16,modbus::Message> = HashMap::new();
     while let Ok(packet) = cap.next_packet() {
         let time = packet.header.ts.tv_sec;
-        if let Ok((remaining, eth_frame)) = parse_ethernet_frame(packet.data) {
+        if let Ok((remaining, eth_frame)) = ethernet::parse_ethernet_frame(packet.data) {
             if eth_frame.ethertype != ethernet::EtherType::IPv4 {
-                // println!("{:?}", eth_frame);
+                //println!("{:?}", eth_frame);
                 continue;
             }
 
@@ -66,19 +95,19 @@ fn main() {
                                     let function = request.1.function.code;
                                     let access = request.1.access_type;
                                     let valid: bool = message.matches(&request.1);
-                                    let mult = access.intersects(AccessType::MULTIPLE);
+                                    let _mult = access.intersects(modbus::AccessType::MULTIPLE);
                                     //this ignores all the cases that aren't present in the data which is gross but here we are
                                     let (data, data_coils): (Option<u16>, Option<bool>) =
-                                        match access.intersects(AccessType::COILS) {
+                                        match access.intersects(modbus::AccessType::COILS) {
                                             false => {
                                                 let data: Option<u16> = match message.data {
-                                                    Data::Read(Read::Response(data)) => {
+                                                    modbus::Data::Read(modbus::Read::Response(data)) => {
                                                         Some(u16::from_be_bytes(
                                                             (data[0], data[1]).into(),
                                                         ))
                                                     }
 
-                                                    Data::Write(Write::Other {
+                                                    modbus::Data::Write(modbus::Write::Other {
                                                         address: _,
                                                         data,
                                                     }) => Some(data),
@@ -89,13 +118,13 @@ fn main() {
                                             }
                                             true => {
                                                 let data: Option<bool> = match message.data {
-                                                    Data::Read(Read::Response(data)) => {
+                                                    modbus::Data::Read(modbus::Read::Response(data)) => {
                                                         Some(match data[0] {
                                                             0 => false,
                                                             _ => true,
                                                         })
                                                     }
-                                                    Data::Write(Write::Other {
+                                                    modbus::Data::Write(modbus::Write::Other {
                                                         address: _,
                                                         data,
                                                     }) => Some(match data {
@@ -108,11 +137,11 @@ fn main() {
                                             }
                                         };
                                     let address = match request.1.data {
-                                        Data::Read(Read::Request {
+                                        modbus::Data::Read(modbus::Read::Request {
                                             address,
                                             quantity: _,
                                         }) => address,
-                                        Data::Write(Write::Other { address, data: _ }) => address,
+                                        modbus::Data::Write(modbus::Write::Other { address, data: _ }) => address,
                                         _ => 0,
                                     };
 
@@ -126,7 +155,7 @@ fn main() {
                                         response_data: data,
                                         response_coils: data_coils,
                                     };
-                                    println!("{}", serde_json::to_string(&trans).unwrap());
+                                    writeln!(writer, "{}", serde_json::to_string(&trans).unwrap()).unwrap();
                                 }
                                 None => {
                                     sessions.insert(message.transaction_id, message);

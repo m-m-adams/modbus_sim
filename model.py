@@ -17,7 +17,7 @@ def get_value(row):
 
     return register
 
-trans = pd.read_json("./modbus_transaction_parser/modbus_trans.jsonl", lines=True)
+trans = pd.read_json("./modbus_transaction_parser/benign.jsonl", lines=True)
 trans["addr"] = trans.apply(get_addr, 1)
 trans["reg"] = trans.apply(get_value, 1)
 #%%
@@ -33,17 +33,18 @@ ts = ts.reset_index().set_index("time")
 ts_df = pd.DataFrame(index=ts.index)
 for key in ts.groupby("addr").indices.keys():
     ts_df[key] = ts[ts["addr"] == key]["reg"]
-ts_df = ts_df.dropna(axis=1)
 ts_df = ts_df[columns]
+ts_df = ts_df.dropna()
+ts_df.head()
 # %%
 best_score = best_model = None
 for idx in range(10):
-    model = hmm.GaussianHMM(n_components=2,n_iter=1000, init_params="mcs")
-    model.transmat_ = np.array([np.random.dirichlet([0.999, 0.001]),
-                                np.random.dirichlet([0.001, 0.999])])
+    model = hmm.GaussianHMM(n_components=2,n_iter=10000, init_params="mcs")
+    model.transmat_ = np.array([np.random.dirichlet([0.9, 0.1]),
+                                np.random.dirichlet([0.1, 0.9])])
 
-    model.fit(ts_df.iloc[10000:][columns])
-    score = model.score(ts_df.iloc[2000:5000])
+    model.fit(ts_df.iloc[500:-500][columns])
+    score = model.score(ts_df.iloc[-500:])
     print(f'Model #{idx}\tScore: {score}')
     if best_score is None or score > best_score:
         best_model = model
@@ -67,12 +68,16 @@ att_ts_df = att_ts_df.dropna(axis=1)[columns]
 
 # %%
 ts_df['score'] = model.predict(ts_df[columns])
-ts_df['att_prob'] = ts_df['score'].resample('5T', label='right', closed='right').mean().resample('10S').interpolate()*200
+ts_df['att_prob'] = ts_df['score']\
+    .resample('5T', label='right', closed='right')\
+        .mean().resample('10S').interpolate()*200
 
 att_ts_df['score'] = model.predict(att_ts_df[columns])
-att_ts_df['att_prob'] = att_ts_df['score'].resample('5T', label='right', closed='right').mean().resample('10S').interpolate()*200
+att_ts_df['att_prob'] = att_ts_df['score']\
+    .resample('5T', label='right', closed='right')\
+        .mean().resample('10S').interpolate()*200
 
-combined = pd.concat([ts_df.iloc[1000:5000][columns + ['att_prob']].resample('5T', label='right', closed='right').mean(), att_ts_df[columns + ['att_prob']].resample('5T', label='right', closed='right').mean()])
+combined = pd.concat([ts_df.iloc[9000:][columns + ['att_prob']].resample('1T', label='right', closed='right').mean(), att_ts_df[columns + ['att_prob']].resample('1T', label='right', closed='right').mean()])
 
 combined[["0:56:register","2:4:register", "att_prob"]].reset_index().drop("time", axis=1)\
     .plot(title="HMM attack probabilities", ylabel="Register value", xlabel="Seconds since simulation start")

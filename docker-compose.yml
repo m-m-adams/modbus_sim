@@ -12,10 +12,15 @@ services:
       - "--port"
       - "502"
   tcpdump:
-    image: kaazing/tcpdump
+    image: nicolaka/netshoot
     network_mode: "service:slaves"
-    capabilities:
-      add: ["NET_ADMIN","NET_RAW", "NET_BIND_SERVICE"]
+    depends_on: 
+      - slaves
+    command: tcpdump -i eth0 -w /tcpdump/modbus.pcap
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - NET_BIND_SERVICE
     volumes:
       - ./tcpdump:/tcpdump
     

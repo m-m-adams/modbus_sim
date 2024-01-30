@@ -1,4 +1,4 @@
-use sawp_modbus::{Data, FunctionCode, Message, Modbus, Read, Write};
+use sawp_modbus::{FunctionCode};
 use serde::Serialize;
 
 #[derive(Serialize)]

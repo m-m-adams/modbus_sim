@@ -73,8 +73,8 @@ class GeneratorController:
 
     def update(self):
         #ocassionally set a fake temperature to make 'attack' traffic
-        if random.randint(0,50) >= 50:
-            self.attack_temperature()
+        # if random.randint(0,50) >= 50:
+        #     self.attack_temperature()
         self.read_temperatures()
         
         self.get_demand()

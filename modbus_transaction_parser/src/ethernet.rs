@@ -19,8 +19,8 @@ pub(crate) fn mac_address(input: &[u8]) -> IResult<&[u8], MacAddress> {
 }
 
 fn parse_ethertype(input: &[u8]) -> IResult<&[u8], EtherType> {
-    let (input, _) = number::streaming::be_u16(input)?;
     let (input, ether) = number::streaming::be_u16(input)?;
+    let (input, _) = number::streaming::be_u16(input)?;
 
     Ok((input, ether.into()))
 }
