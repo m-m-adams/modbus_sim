@@ -8,15 +8,13 @@ use sawp_modbus::Modbus;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{stdout, BufWriter, Write};
-use std::process::Output;
 use structopt::StructOpt;
 use std::path::PathBuf;
 mod modbus_defs;
-use ethernet::*;
 use modbus_defs::*;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "example", about = "An example of StructOpt usage.")]
+#[structopt(name = "Inputs", about = "Provide input and optional output paths")]
 struct Opt {
 
     /// Input file

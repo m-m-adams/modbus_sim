@@ -93,7 +93,7 @@ if __name__ == "__main__":
     logging.log(logging.INFO, f"connecting to {args.hostname}:{args.port}")
     # Connect to the Modbus TCP server
     client = ModbusTcpClient(args.hostname, port=args.port)
-    logging.log(logging.INFO, client.read_device_information().information)
+    #logging.log(logging.INFO, client.read_device_information().information)
     controller = GeneratorController(client)
 
     counter: int = 0
