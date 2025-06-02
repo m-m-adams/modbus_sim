@@ -75,93 +75,96 @@ fn main() {
             //println!("{:?}", eth_frame);
 
             if let Ok((remaining, _ipv4_packet)) = ipv4::parse_ipv4_header(remaining) {
-                //println!("{:?}", ipv4_packet);
+                println!("{:?}", _ipv4_packet);
                 if let Ok((remaining, tcp_packet)) = tcp::parse_tcp_header(remaining) {
-                    //println!("{:?}", tcp_packet);
+                    println!("{:?}", tcp_packet);
                     let direction: Direction;
                     match tcp_packet.source_port {
                         502 => direction = Direction::ToClient,
                         _ => direction = Direction::ToServer,
                     }
-                    match parse_modbus(remaining, direction) {
-                        Ok(Some(mut message)) => {
-                            if !message.error_flags.is_empty() {
-                                panic!("{:?}", message);
-                            }
-                            match sessions.remove_entry(&message.transaction_id) {
-                                Some(request) => {
-                                    let function = request.1.function.code;
-                                    let access = request.1.access_type;
-                                    let valid: bool = message.matches(&request.1);
-                                    let _mult = access.intersects(modbus::AccessType::MULTIPLE);
-                                    //this ignores all the cases that aren't present in the data which is gross but here we are
-                                    let (data, data_coils): (Option<u16>, Option<bool>) =
-                                        match access.intersects(modbus::AccessType::COILS) {
-                                            false => {
-                                                let data: Option<u16> = match message.data {
-                                                    modbus::Data::Read(modbus::Read::Response(data)) => {
-                                                        Some(u16::from_be_bytes(
-                                                            (data[0], data[1]).into(),
-                                                        ))
-                                                    }
+                    if tcp_packet.source_port == 502 || tcp_packet.dest_port == 502 {
+                        match parse_modbus(remaining, direction) {
+                            Ok(Some(mut message)) => {
+                                println!("{:?}", message);
+                                if !message.error_flags.is_empty() {
+                                    panic!("{:?}", message);
+                                }
+                                match sessions.remove_entry(&message.transaction_id) {
+                                    Some(request) => {
+                                        let function = request.1.function.code;
+                                        let access = request.1.access_type;
+                                        let valid: bool = message.matches(&request.1);
+                                        let _mult = access.intersects(modbus::AccessType::MULTIPLE);
+                                        //this ignores all the cases that aren't present in the data which is gross but here we are
+                                        let (data, data_coils): (Option<u16>, Option<bool>) =
+                                            match access.intersects(modbus::AccessType::COILS) {
+                                                false => {
+                                                    let data: Option<u16> = match message.data {
+                                                        modbus::Data::Read(modbus::Read::Response(data)) => {
+                                                            Some(
+                                                                (data[0] ).into(),
+                                                             )
+                                                        }
 
-                                                    modbus::Data::Write(modbus::Write::Other {
-                                                        address: _,
-                                                        data,
-                                                    }) => Some(data),
-                                                    _ => None,
-                                                };
-                                                let data_coils = None;
-                                                (data, data_coils)
-                                            }
-                                            true => {
-                                                let data: Option<bool> = match message.data {
-                                                    modbus::Data::Read(modbus::Read::Response(data)) => {
-                                                        Some(match data[0] {
+                                                        modbus::Data::Write(modbus::Write::Other {
+                                                                                address: _,
+                                                                                data,
+                                                                            }) => Some(data),
+                                                        _ => None,
+                                                    };
+                                                    let data_coils = None;
+                                                    (data, data_coils)
+                                                }
+                                                true => {
+                                                    let data: Option<bool> = match message.data {
+                                                        modbus::Data::Read(modbus::Read::Response(data)) => {
+                                                            Some(match data[0] {
+                                                                0 => false,
+                                                                _ => true,
+                                                            })
+                                                        }
+                                                        modbus::Data::Write(modbus::Write::Other {
+                                                                                address: _,
+                                                                                data,
+                                                                            }) => Some(match data {
                                                             0 => false,
                                                             _ => true,
-                                                        })
-                                                    }
-                                                    modbus::Data::Write(modbus::Write::Other {
-                                                        address: _,
-                                                        data,
-                                                    }) => Some(match data {
-                                                        0 => false,
-                                                        _ => true,
-                                                    }),
-                                                    _ => None,
-                                                };
-                                                (None, data)
-                                            }
+                                                        }),
+                                                        _ => None,
+                                                    };
+                                                    (None, data)
+                                                }
+                                            };
+                                        let address = match request.1.data {
+                                            modbus::Data::Read(modbus::Read::Request {
+                                                                   address,
+                                                                   quantity: _,
+                                                               }) => address,
+                                            modbus::Data::Write(modbus::Write::Other { address, data: _ }) => address,
+                                            _ => 0,
                                         };
-                                    let address = match request.1.data {
-                                        modbus::Data::Read(modbus::Read::Request {
-                                            address,
-                                            quantity: _,
-                                        }) => address,
-                                        modbus::Data::Write(modbus::Write::Other { address, data: _ }) => address,
-                                        _ => 0,
-                                    };
 
-                                    let trans = Transaction {
-                                        time,
-                                        transaction_id: message.transaction_id,
-                                        valid,
-                                        unit_id: message.unit_id,
-                                        function,
-                                        address: address,
-                                        response_data: data,
-                                        response_coils: data_coils,
-                                    };
-                                    writeln!(writer, "{}", serde_json::to_string(&trans).unwrap()).unwrap();
-                                }
-                                None => {
-                                    sessions.insert(message.transaction_id, message);
+                                        let trans = Transaction {
+                                            time,
+                                            transaction_id: message.transaction_id,
+                                            valid,
+                                            unit_id: message.unit_id,
+                                            function,
+                                            address: address,
+                                            response_data: data,
+                                            response_coils: data_coils,
+                                        };
+                                        writeln!(writer, "{}", serde_json::to_string(&trans).unwrap()).unwrap();
+                                    }
+                                    None => {
+                                        sessions.insert(message.transaction_id, message);
+                                    }
                                 }
                             }
+                            Err(_e) => {}
+                            Ok(None) => {}
                         }
-                        Err(_e) => {}
-                        Ok(None) => {}
                     }
                 }
             }

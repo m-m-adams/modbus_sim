@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "modbus-transaction-parser"
+version = "0.1.0"
+description = ""
+authors = ["m-m-adams <mark.adams@queensu.ca>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pandas = "^2.2.2"
+hmmlearn = "^0.3.2"
+numpy = "^1.26.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

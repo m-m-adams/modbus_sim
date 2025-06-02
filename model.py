@@ -90,3 +90,4 @@ combined[["Temperature","Speed", "att_prob"]].reset_index().drop("time", axis=1)
 combined.reset_index().drop("time", axis=1)\
     .plot(title="HMM attack probabilities", ylabel="Register value", xlabel="Seconds since simulation start")
 # %%
+
