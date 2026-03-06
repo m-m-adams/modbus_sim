@@ -6,7 +6,7 @@ import generator
 import argparse
 from pymodbus.device import ModbusDeviceIdentification
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
-from pymodbus.server.async_io import StartTcpServer, StartAsyncTcpServer
+from pymodbus.server import StartTcpServer, StartAsyncTcpServer
 from twisted.internet.task import LoopingCall
 
 # Enable logging (makes it easier to debug if something goes wrong)
