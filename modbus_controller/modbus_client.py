@@ -3,6 +3,7 @@ import random
 import logging
 import argparse
 import random
+from pymodbus import ModbusException
 from pymodbus.client.tcp import ModbusTcpClient
 
 
@@ -23,18 +24,33 @@ class GeneratorController:
         self.client = client
         self.target_temp = 25
         self.desired_power = 300
-        self.update()
+        conn = False
+        for i in range(5):
+            logging.log(logging.INFO, f"try {i}")
+            conn = self.client.connect()
+            if conn: 
+                break
+            time.sleep(1)
+
+        logging.log(logging.INFO, f"server is up after {i} tries")
         
     def read_temperatures(self):
-
-        self.temperature = self.client.read_holding_registers(address=56, count=1, slave=0).registers[0]
-        self.target_temp = self.client.read_holding_registers(address=0, count=1, slave=0).registers[0]
+        resp = self.client.read_holding_registers(address=56, count=1, slave=1)
+        if resp.isError():
+            logging.log(logging.ERROR, f"error {resp}")
+        else:
+            self.temperature = resp.registers[0]
+        resp = self.client.read_holding_registers(address=0, count=1, slave=1)
+        if resp.isError():
+            logging.log(logging.ERROR, f"error {resp}")
+        else:
+            self.target_temp = resp.registers[0]
         logging.log(logging.INFO, f"temp is {self.temperature}")
 
         cold = (self.target_temp < self.temperature)
         #set coil 1 of slave 1 (cooler) on to turn on air conditioning
         self.client.write_coil(0, cold, slave=1)
-        self.cooling_running = self.client.read_coils(2, 1, slave=1).bits[0]
+        self.cooling_running = self.client.read_coils(2, count=1, slave=1).bits[0]
         self.cooling = cold
 
     def read_power(self):
@@ -85,7 +101,7 @@ class GeneratorController:
 
 if __name__ == "__main__":
     log = logging.getLogger()
-    log.setLevel(logging.INFO)
+    log.setLevel(logging.ERROR)
     parser = argparse.ArgumentParser()
     parser.add_argument("--hostname", nargs='?', type=str, default="localhost")
     parser.add_argument("--port", nargs='?', type=int, default=502)
@@ -98,7 +114,10 @@ if __name__ == "__main__":
 
     counter: int = 0
     while True:
-        controller.update()
+        try:
+            controller.update()
+        except ModbusException as e:
+            print(e)
         time.sleep(1)
         counter +=1
         if counter % 5 == 0:
